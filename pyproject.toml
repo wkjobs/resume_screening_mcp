@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resume_screening_mcp"
+version = "0.1.0"
+description = "Resume screening service using LLM"
+authors = [
+    {name = "User", email = "user@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "fastmcp",
+    "openai>=1.0.0",
+    "PyPDF2",
+    "python-docx",
+    "pandas",
+    "pdfplumber",
+    "python-dotenv",
+]
+
+[project.scripts]
+resume-screening = "resume_screening_mcp.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+]
+
+[tool.setuptools]
+packages = ["resume_screening_mcp"] 
