@@ -7,6 +7,8 @@ from typing import Dict, Any
 from pathlib import Path
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from datetime import datetime
+
 
 from resume_screening_mcp.cli import setup_logging
 from resume_screening_mcp.core import (
