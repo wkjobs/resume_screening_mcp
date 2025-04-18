@@ -14,7 +14,8 @@ from resume_screening_mcp.cli import setup_logging
 from resume_screening_mcp.core import (
     get_resume_list,
     summarize_resume,
-    evaluate_resume_requirements
+    evaluate_resume_requirements,
+    get_resume_content
 )
 
 # Load environment variables
@@ -146,40 +147,70 @@ async def process_resumes_mcp(request) -> Dict[str, Any]:
             }
         
         # Step 1: First summarize each resume
-        logger.info("===== SUMMARIZING RESUMES =====")
-        summaries = []
+        # 预先提取所有简历的内容并缓存
+        logger.info("预先提取并缓存所有简历内容...")
         for resume_file in resume_files:
-            logger.info(f"Summarizing resume: {resume_file}")
-            summary = summarize_resume(resume_file)
-            summaries.append(summary)
+            get_resume_content(resume_file)
             
-            # Print a preview of the summary to console
-            logger.info(f"\n===== RESUME SUMMARY: {summary.get('file_name')} =====")
-            if "error" in summary:
-                logger.error(f"Error: {summary.get('error')}")
-            else:
-                for key, value in summary.items():
-                    if key not in ["file_name", "file_path", "parsing_error"]:
-                        if isinstance(value, str) and len(value) > 200:
-                            logger.info(f"{key}: {value[:200]}...")
-                        else:
-                            logger.info(f"{key}: {value}")
-            logger.info("=" * 50)
+        # 修改处理流程: 先评估匹配性，再对匹配的简历生成摘要
         
-        # Save summaries to file
-        if summaries:
-            summary_file = report_path / f"resume_summaries_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            with open(summary_file, "w", encoding="utf-8") as f:
-                json.dump(summaries, f, ensure_ascii=False, indent=2)
-            logger.info(f"Saved resume summaries to: {summary_file}")
-        
-        # Step 2: Process each resume for matching requirements
+        # Step 1: 首先评估所有简历是否匹配需求
         logger.info("\n===== MATCHING RESUMES TO REQUIREMENTS =====")
         results = []
+        matching_resumes = []
+        
         for resume_file in resume_files:
-            logger.info(f"Processing resume: {resume_file}")
+            logger.info(f"评估简历是否匹配需求: {resume_file}")
             evaluation = evaluate_resume_requirements(resume_file, requirements)
             results.append(evaluation)
+            
+            # 保存匹配的简历文件路径
+            if evaluation.get('matched', False):
+                logger.info(f"简历匹配需求: {resume_file}")
+                matching_resumes.append(resume_file)
+            else:
+                logger.info(f"简历不匹配需求: {resume_file}")
+        
+        # 计算匹配率
+        matching_count = len(matching_resumes)
+        total_count = len(resume_files)
+        matching_rate = (matching_count / total_count) * 100 if total_count > 0 else 0
+        
+        logger.info(f"简历匹配统计: 总数={total_count}, 匹配数={matching_count}, 匹配率={matching_rate:.2f}%")
+        
+        # Step 2: 只为匹配的简历生成摘要
+        logger.info("\n===== GENERATING SUMMARIES FOR MATCHING RESUMES =====")
+        summaries = []
+        
+        if matching_resumes:
+            for resume_file in matching_resumes:
+                logger.info(f"为匹配简历生成摘要: {resume_file}")
+                summary = summarize_resume(resume_file)
+                summaries.append(summary)
+                
+                # Print a preview of the summary to console
+                logger.info(f"\n===== RESUME SUMMARY: {summary.get('file_name')} =====")
+                if "error" in summary:
+                    logger.error(f"Error: {summary.get('error')}")
+                else:
+                    for key, value in summary.items():
+                        if key not in ["file_name", "file_path", "parsing_error"]:
+                            if isinstance(value, str) and len(value) > 200:
+                                logger.info(f"{key}: {value[:200]}...")
+                            else:
+                                logger.info(f"{key}: {value}")
+                logger.info("=" * 50)
+            
+            # Save summaries to file
+            if summaries:
+                summary_file = report_path / f"resume_summaries_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                with open(summary_file, "w", encoding="utf-8") as f:
+                    json.dump(summaries, f, ensure_ascii=False, indent=2)
+                logger.info(f"Saved resume summaries to: {summary_file}")
+        else:
+            logger.info("没有匹配的简历，跳过摘要生成步骤")
+        
+        # Step 3: Generate report
         
         # Generate report
         if results:
@@ -206,7 +237,8 @@ Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 Summary:
 - Total resumes processed: {len(results)}
-- Total matches found: {len([r for r in results if r.get('matched', False)])}
+- Total matches found: {matching_count}
+- Matching rate: {matching_rate:.2f}%
 
 Matched Resumes:
 """
@@ -248,7 +280,7 @@ Matched Resumes:
             
             return {
                 "status": "success",
-                "message": f"Processing complete! Found {len([r for r in results if r.get('matched', False)])} matching resumes.",
+                "message": f"处理完成! 共处理 {total_count} 份简历，找到 {matching_count} 份匹配简历 (匹配率: {matching_rate:.2f}%)。",
                 "excel_report": str(excel_file),
                 "text_report": str(text_file),
                 "results": results,

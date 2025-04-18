@@ -225,7 +225,7 @@ def main():
                         help='Directory for storing log files')
     
     # Parse arguments
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     
     # Setup logging
     log_file = setup_logging(args.log_dir)

@@ -10,7 +10,7 @@ setup(
     entry_points={
         "console_scripts": [
             "resume-screening=resume_screening_mcp.cli:main",
-            "resume-screening-server=resume_screening_mcp.server:run_server",
+            "resume-screening-mcp=resume_screening_mcp.server:run_server",
         ],
     },
 ) 

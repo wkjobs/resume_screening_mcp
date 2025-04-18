@@ -131,10 +131,18 @@ def get_resume_list(resume_dir: str) -> List[str]:
         logger.error(f"Error listing resumes: {str(e)}")
         return []
 
+# 全局内容缓存字典
+resume_content_cache = {}
 
 def get_resume_content(file_path: str) -> str:
-    """Extract content from a resume file"""
+    """Extract content from a resume file with caching"""
     try:
+        # 检查内容是否已在缓存中
+        if file_path in resume_content_cache:
+            logger.info(f"从缓存获取简历内容: {file_path}")
+            return resume_content_cache[file_path]
+        
+        logger.info(f"提取简历内容: {file_path}")
         processor = ResumeProcessor("", [])  # Empty parameters as we just need extraction methods
         
         path = Path(file_path)
@@ -142,17 +150,22 @@ def get_resume_content(file_path: str) -> str:
         if not path.exists():
             logger.error(f"File does not exist: {path.absolute()}")
             return ""
-        
         content = processor.extract_text(path)
         if not content:
             logger.error(f"Could not extract text from '{file_path}'")
             return ""
         
-        # Return a snippet if content is too long
+        # 缓存提取的内容
         content_length = len(content)
         
         if content_length > 5000:
-            return content[:5000] + "... (content truncated)"
+            # 仅缓存截断后的内容
+            truncated_content = content[:5000] + "... (content truncated)"
+            resume_content_cache[file_path] = truncated_content
+            return truncated_content
+        else:
+            resume_content_cache[file_path] = content
+            return content
         return content
     except Exception as e:
         logger.error(f"Error extracting content: {str(e)}")
